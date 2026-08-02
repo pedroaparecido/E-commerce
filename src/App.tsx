@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Navbar } from "./components/Navbar/Navbar"
 import { ProductCard } from "./components/Cards/ProductCard"
+import { CartDrawer } from "./components/Cart/CartDrawer"
 import { DropshippingSyncPage } from "./pages/admin/DropshippingSyncPage"
 import { api } from "./lib/api"
 import type { Product } from "./types/product"
@@ -12,16 +13,17 @@ export function App() {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   
+  // Controle de estado da Gaveta do Carrinho
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false)
+
   // Alternador simples entre Loja e Painel Admin
   const [currentTab, setCurrentTab] = useState<'shop' | 'admin'>('shop')
 
   const addItem = useCartStore((state) => state.addItem)
 
-  // Função de busca sem nenhum setState síncrono pré-await
   const fetchProducts = useCallback(async () => {
     try {
       const response = await api.get<Product[]>('/products')
-      // Todos os setStates agora ocorrem APÓS a resolução da Promise
       setProducts(response.data)
       setError(null)
     } catch (err: any) {
@@ -32,12 +34,10 @@ export function App() {
     }
   }, [])
 
-  // O useEffect chama a função sem causar renderizações síncronas em cascata
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
 
-  // Em eventos de clique (User Input), setState síncrono é 100% permitido
   const handleRefresh = () => {
     setLoading(true)
     setError(null)
@@ -45,13 +45,20 @@ export function App() {
   }
 
   const handleAddToCart = (product: Product) => {
-    console.log("Produto adicionado:", product.title)
     addItem(product)
+    setIsCartOpen(true) // Abre a gaveta automaticamente ao adicionar um produto!
   }
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center w-full">
-      <Navbar />
+      {/* Navbar com gatilho para abrir o carrinho */}
+      <Navbar onOpenCart={() => setIsCartOpen(true)} />
+
+      {/* Gaveta do Carrinho */}
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={() => setIsCartOpen(false)} 
+      />
       
       {/* Barra de alternância entre Loja e Admin */}
       <div className="w-full border-b border-zinc-800 bg-zinc-950 px-4 py-2.5 flex justify-center gap-4 text-xs font-medium">
@@ -105,22 +112,19 @@ export function App() {
               </button>
             </div>
 
-            {/* Carregamento */}
             {loading && (
               <div className="flex flex-col items-center justify-center py-20 text-zinc-400 gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
                 <p className="text-sm">Buscando catálogo no banco de dados...</p>
               </div>
             )}
 
-            {/* Mensagem de Erro */}
             {error && !loading && (
               <div className="p-4 bg-rose-950/40 border border-rose-800/60 rounded-xl text-rose-300 text-sm text-center my-8">
                 {error}
               </div>
             )}
 
-            {/* Sem produtos */}
             {!loading && !error && products.length === 0 && (
               <div className="p-12 text-center bg-zinc-900/50 border border-zinc-800 rounded-xl my-8 space-y-3">
                 <p className="text-zinc-300 font-medium">Nenhum produto cadastrado no banco ainda.</p>
@@ -130,7 +134,6 @@ export function App() {
               </div>
             )}
 
-            {/* Grid de Produtos */}
             {!loading && !error && products.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {products.map((product) => (
