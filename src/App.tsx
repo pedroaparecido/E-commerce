@@ -4,6 +4,7 @@ import { ProductCard } from "./components/Cards/ProductCard"
 import { DropshippingSyncPage } from "./pages/admin/DropshippingSyncPage"
 import { api } from "./lib/api"
 import type { Product } from "./types/product"
+import { useCartStore } from "./store/useCartStore"
 import { Loader2, RefreshCw, ShoppingBag } from "lucide-react"
 
 export function App() {
@@ -14,13 +15,15 @@ export function App() {
   // Alternador simples entre Loja e Painel Admin
   const [currentTab, setCurrentTab] = useState<'shop' | 'admin'>('shop')
 
-  // Função única de busca encapsulada com useCallback
+  const addItem = useCartStore((state) => state.addItem)
+
+  // Função de busca sem nenhum setState síncrono pré-await
   const fetchProducts = useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
       const response = await api.get<Product[]>('/products')
+      // Todos os setStates agora ocorrem APÓS a resolução da Promise
       setProducts(response.data)
+      setError(null)
     } catch (err: any) {
       console.error("Erro ao carregar produtos:", err)
       setError("Não foi possível carregar o catálogo. Verifique se o backend na porta 3333 está ativo.")
@@ -29,12 +32,21 @@ export function App() {
     }
   }, [])
 
+  // O useEffect chama a função sem causar renderizações síncronas em cascata
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
 
+  // Em eventos de clique (User Input), setState síncrono é 100% permitido
+  const handleRefresh = () => {
+    setLoading(true)
+    setError(null)
+    fetchProducts()
+  }
+
   const handleAddToCart = (product: Product) => {
     console.log("Produto adicionado:", product.title)
+    addItem(product)
   }
 
   return (
@@ -85,7 +97,7 @@ export function App() {
               </div>
 
               <button 
-                onClick={fetchProducts}
+                onClick={handleRefresh}
                 className="text-xs text-zinc-400 hover:text-white flex items-center gap-1 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-md transition-colors"
               >
                 <RefreshCw className="w-3 h-3" />
